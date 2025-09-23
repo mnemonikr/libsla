@@ -6,6 +6,10 @@ Nothing here yet.
 
 Minor update moving code out of symbolic-pcode workspace and into its own repository
 
+### Changed
+
+* Updated README.md to link to this change log
+
 ## v0.4.3
 
 ### Added
