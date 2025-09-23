@@ -1,0 +1,51 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose --all-targets
+    - name: Format
+      run: cargo fmt --all -- --check
+    - name: Unit Tests
+      run: cargo test --verbose
+    - name: Coverage Report
+      run: |
+        rustup component add llvm-tools-preview
+        PATH=$(rustup show home | xargs -I '{}' find {} -name 'llvm-profdata' | xargs -I '{}' dirname {}):$PATH
+        RUSTFLAGS="-C instrument-coverage" cargo test --lib
+        find . -name '*.profraw' > profraw-files.txt
+        llvm-profdata merge -sparse -f profraw-files.txt -o merged.profdata
+        llvm-cov report \
+          $( \
+            for file in \
+              $( \
+                RUSTFLAGS="-C instrument-coverage" \
+                  cargo test --lib --no-run --message-format=json \
+                    | jq -r "select(.profile.test == true) | .filenames[]" \
+                    | grep -v dSYM - \
+              ); \
+            do \
+              printf "%s %s " -object $file; \
+            done \
+          ) \
+        --instr-profile=merged.profdata \
+        --summary-only \
+        --use-color \
+        --ignore-filename-regex='/.cargo/registry' \
+        --ignore-filename-regex='rustc/' \
+        --ignore-filename-regex='src/tests/'
+
