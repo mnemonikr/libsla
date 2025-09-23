@@ -4,6 +4,10 @@ This crate provides Rust bindings to the Sleigh library libsla found in [NSA's G
 which disassembles processor instructions into p-code. This enables binary analysis programs to
 analyze arbitrary programs by targeting p-code instead of specific instruction set architectures.
 
+# Latest Changes
+
+See [change log](./CHANGELOG.md) for latest changes.
+
 # Configuration
 
 Building a Sleigh instance requires a _compiled sleigh specification_ (.sla) and a
