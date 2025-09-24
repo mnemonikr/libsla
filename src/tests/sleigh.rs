@@ -5,8 +5,8 @@ use flate2::{
     bufread::{ZlibDecoder, ZlibEncoder},
 };
 use libsla_sys::sys;
+use sleigh_config::processor_x86::PSPEC_X86_64 as PROCESSOR_SPEC;
 use sleigh_config::processor_x86::SLA_X86_64 as SLEIGH_SPEC;
-use sleigh_config::processor_x86::{PSPEC_X86_64 as PROCESSOR_SPEC, SLA_X86};
 
 use crate::*;
 
