@@ -2,7 +2,7 @@
 
 Nothing here yet.
 
-## v0.4.4
+## [v0.4.4](https://github.com/mnemonikr/libsla/tree/v0.4.4)
 
 Minor update moving code out of symbolic-pcode workspace and into its own repository
 
