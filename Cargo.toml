@@ -15,4 +15,4 @@ libsla-sys = { version = "0.1.4" }
 
 [dev-dependencies]
 flate2 = "1.1"
-sleigh-config = { version = "0.1", features = ["x86"] }
+sleigh-config = { version = "1", features = ["x86"] }
