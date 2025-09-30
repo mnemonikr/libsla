@@ -131,7 +131,7 @@ fn build_raw_sla() -> Result<()> {
 
     let sleigh = GhidraSleigh::builder()
         .processor_spec(PROCESSOR_SPEC)?
-        .sla_decoder(SlaDecoder::Raw)
+        .sla_encoding(SlaDataEncoding::Raw)
         .build(&decoded)?;
     verify_sleigh(sleigh);
     Ok(())

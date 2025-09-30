@@ -12,7 +12,7 @@ use libsla_sys::sys;
 /// Tracks whether the one-time initialization required for libsla has been performed
 static LIBSLA_INIT: Once = Once::new();
 
-/// Errors returned by this crate. Note that some APIs that may pass through FFI boundaries return
+/// Errors returned by this crate. Note that APIs that may pass through FFI boundaries return
 /// [String] since those errors are ultimately serialized anyway.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -281,6 +281,7 @@ impl From<&sys::AddrSpace> for AddressSpaceId {
     }
 }
 
+/// Types for an [AddressSpace].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AddressSpaceType {
     /// Special space to represent constants
@@ -498,13 +499,14 @@ enum DisassemblyKind<'a> {
     Pcode(&'a mut PcodeDisassemblyOutput),
 }
 
-#[derive(Default, Copy, Clone, Debug)]
-pub enum SlaDecoder {
-    /// Standard .sla decoder. Expects header with appropriate version and zlib compressed data.
+/// The encoding of the compiled sleigh specification (.slaspec).
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SlaDataEncoding {
+    /// Standard .sla encoding. Includes header with appropriate version and zlib compressed data.
     #[default]
     Sla,
 
-    /// Raw decoder without a header and uncompressed data.
+    /// Raw encoding. Does not include a header and the data is uncompressed.
     Raw,
 }
 
@@ -514,23 +516,20 @@ pub enum MissingSpec {}
 /// The sleigh or processor specification has been provided
 pub enum HasSpec {}
 
-/// Builder for [GhidraSleigh]. The parameters `S` and `P` track whether the sleigh and processor
-/// specifications have been provided.
-pub struct GhidraSleighBuilder<S, P> {
+/// Builder for [GhidraSleigh]. The parameter `P` tracks whether the processor specification has
+/// been provided.
+pub struct GhidraSleighBuilder<P> {
     /// Document store for sleigh and processor specifications
     store: UniquePtr<sys::DocumentStorage>,
 
-    /// Optional .sla decoder. Not used if using document store for sla specification
-    sla_decoder: Option<SlaDecoder>,
-
-    /// Phantom data for type tracking whether sleigh specification has been provided
-    sleigh_spec: std::marker::PhantomData<S>,
+    /// The data encoding for the sla specification
+    sla_encoding: SlaDataEncoding,
 
     /// Phantom data for type tracking whether processor specification has been provided
     processor_spec: std::marker::PhantomData<P>,
 }
 
-impl Default for GhidraSleighBuilder<MissingSpec, MissingSpec> {
+impl Default for GhidraSleighBuilder<MissingSpec> {
     fn default() -> Self {
         // This global libsla initialization is required for parsing sleigh document
         LIBSLA_INIT.call_once(|| {
@@ -540,19 +539,15 @@ impl Default for GhidraSleighBuilder<MissingSpec, MissingSpec> {
 
         Self {
             store: sys::new_document_storage(),
-            sla_decoder: Default::default(),
-            sleigh_spec: Default::default(),
+            sla_encoding: Default::default(),
             processor_spec: Default::default(),
         }
     }
 }
 
-impl<S> GhidraSleighBuilder<S, MissingSpec> {
+impl GhidraSleighBuilder<MissingSpec> {
     /// Use this processor specification for this sleigh instance.
-    pub fn processor_spec(
-        mut self,
-        processor_spec: &str,
-    ) -> Result<GhidraSleighBuilder<S, HasSpec>> {
+    pub fn processor_spec(mut self, processor_spec: &str) -> Result<GhidraSleighBuilder<HasSpec>> {
         let_cxx_string!(processor_spec = processor_spec);
         sys::parse_document_and_register_root(self.store.pin_mut(), &processor_spec).map_err(
             |err| Error::DependencyError {
@@ -561,54 +556,21 @@ impl<S> GhidraSleighBuilder<S, MissingSpec> {
             },
         )?;
 
-        Ok(GhidraSleighBuilder::<S, HasSpec> {
+        Ok(GhidraSleighBuilder::<HasSpec> {
             store: self.store,
-            sla_decoder: self.sla_decoder,
-            sleigh_spec: std::marker::PhantomData,
+            sla_encoding: self.sla_encoding,
             processor_spec: std::marker::PhantomData,
         })
     }
 }
 
-impl<P> GhidraSleighBuilder<MissingSpec, P> {
-    /// Use this sleigh specification for this sleigh instance.
-    ///
-    // In Ghidra 11.1+ the sleigh_spec is just <sleigh>path/to/file.sla</sleigh>.
-    // This function creates this string using the provided path.
-    pub fn sleigh_spec(
-        mut self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<GhidraSleighBuilder<HasSpec, P>> {
-        let path = path
-            .as_ref()
-            .as_os_str()
-            .to_str()
-            .ok_or_else(|| Error::InvalidInput {
-                message: Cow::Borrowed("path should be a valid UTF-8"),
-            })?;
-        let_cxx_string!(sleigh_spec = format!("<sleigh>{path}</sleigh>"));
-        sys::parse_document_and_register_root(self.store.pin_mut(), &sleigh_spec).map_err(
-            |err| Error::DependencyError {
-                message: Cow::Borrowed("failed to parse sleigh specification"),
-                source: Box::new(err),
-            },
-        )?;
-
-        Ok(GhidraSleighBuilder::<HasSpec, P> {
-            store: self.store,
-            sla_decoder: None,
-            sleigh_spec: std::marker::PhantomData,
-            processor_spec: std::marker::PhantomData,
-        })
-    }
-}
-
-impl GhidraSleighBuilder<MissingSpec, HasSpec> {
-    pub fn sla_decoder(self, decoder: SlaDecoder) -> Self {
+impl GhidraSleighBuilder<HasSpec> {
+    /// Set the encoding of the sla data. This setting has no effect if building with an XML sleigh
+    /// specification file.
+    pub fn sla_encoding(self, encoding: SlaDataEncoding) -> Self {
         Self {
             store: self.store,
-            sla_decoder: Some(decoder),
-            sleigh_spec: std::marker::PhantomData,
+            sla_encoding: encoding,
             processor_spec: std::marker::PhantomData,
         }
     }
@@ -616,43 +578,18 @@ impl GhidraSleighBuilder<MissingSpec, HasSpec> {
     pub fn build(self, sla: impl AsRef<[u8]>) -> Result<GhidraSleigh> {
         let_cxx_string!(sla = sla);
         let mut sleigh = sys::new_sleigh(sys::new_context_internal());
-        let decoder = self.sla_decoder.unwrap_or_default();
 
         let pin = sleigh.pin_mut();
 
-        let init_result = match decoder {
-            SlaDecoder::Sla => pin.initialize_from_sla(&sla),
-            SlaDecoder::Raw => pin.initialize_from_raw_sla(&sla),
+        let init_result = match self.sla_encoding {
+            SlaDataEncoding::Sla => pin.initialize_from_sla(&sla),
+            SlaDataEncoding::Raw => pin.initialize_from_raw_sla(&sla),
         };
 
         init_result.map_err(|err| Error::DependencyError {
             message: Cow::Borrowed("failed to initialize Ghidra sleigh"),
             source: Box::new(err),
         })?;
-
-        sleigh
-            .pin_mut()
-            .parse_processor_config(&self.store)
-            .map_err(|err| Error::DependencyError {
-                message: Cow::Borrowed("failed to import processor config"),
-                source: Box::new(err),
-            })?;
-
-        Ok(GhidraSleigh { sleigh })
-    }
-}
-
-impl GhidraSleighBuilder<HasSpec, HasSpec> {
-    pub fn build(mut self) -> Result<GhidraSleigh> {
-        let mut sleigh = sys::new_sleigh(sys::new_context_internal());
-
-        sleigh
-            .pin_mut()
-            .initialize(self.store.pin_mut())
-            .map_err(|err| Error::DependencyError {
-                message: Cow::Borrowed("failed to initialize Ghidra sleigh"),
-                source: Box::new(err),
-            })?;
 
         sleigh
             .pin_mut()
@@ -674,7 +611,7 @@ pub struct GhidraSleigh {
 
 impl GhidraSleigh {
     /// Create a new sleigh builder. Use this to construct a sleigh instance.
-    pub fn builder() -> GhidraSleighBuilder<MissingSpec, MissingSpec> {
+    pub fn builder() -> GhidraSleighBuilder<MissingSpec> {
         Default::default()
     }
 
