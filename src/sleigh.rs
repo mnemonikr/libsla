@@ -62,14 +62,14 @@ pub trait Sleigh {
         &self,
         loader: &dyn LoadImage,
         address: Address,
-    ) -> Result<Disassembly<PcodeInstruction>>;
+    ) -> Result<PcodeDisassembly>;
 
     /// Disassemble the instructions at the given address into native assembly instructions.
     fn disassemble_native(
         &self,
         loader: &dyn LoadImage,
         address: Address,
-    ) -> Result<Disassembly<AssemblyInstruction>>;
+    ) -> Result<NativeDisassembly>;
 
     /// Get the register name for a varnode targeting a register. This will return `None` if the
     /// target is not a valid register.
@@ -355,10 +355,16 @@ impl std::fmt::Display for PcodeInstruction {
     }
 }
 
+/// A disassembled native assembly instruction
 #[derive(Clone, Debug)]
 pub struct AssemblyInstruction {
+    /// The origin of the assembly instruction
     pub address: Address,
+
+    /// The instruction mnemonic
     pub mnemonic: String,
+
+    /// The body of the instruction
     pub body: String,
 }
 
@@ -375,37 +381,40 @@ impl std::fmt::Display for AssemblyInstruction {
     }
 }
 
-#[derive(Default)]
-pub struct PcodeDisassemblyOutput {
-    instructions: Vec<PcodeInstruction>,
-}
-
-#[derive(Default)]
-pub struct NativeDisassemblyOutput {
-    instruction: Option<AssemblyInstruction>,
-}
-
-/// A disassembly of instructions originating from a [VarnodeData].
-#[derive(Debug, Clone)]
-pub struct Disassembly<T> {
+/// Disassembly of an instruction into pcode
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PcodeDisassembly {
     /// The disassembled instructions
-    pub instructions: Vec<T>,
+    pub instructions: Vec<PcodeInstruction>,
 
     /// The origin of the instructions
     pub origin: VarnodeData,
 }
 
-impl<T> Disassembly<T> {
-    /// Create a new disassembly
-    pub fn new(instructions: Vec<T>, origin: VarnodeData) -> Self {
-        Self {
-            instructions,
-            origin,
-        }
+/// Disassembly of an instruction into its native assembly
+#[derive(Clone, Debug)]
+pub struct NativeDisassembly {
+    /// The disassembled instruction
+    pub instruction: AssemblyInstruction,
+
+    /// The origin of the instructions
+    pub origin: VarnodeData,
+}
+
+impl std::fmt::Display for NativeDisassembly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "[{origin}]: {instruction}",
+            origin = self.origin,
+            instruction = self.instruction,
+        )?;
+
+        Ok(())
     }
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for Disassembly<T> {
+impl std::fmt::Display for PcodeDisassembly {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -422,6 +431,11 @@ impl<T: std::fmt::Display> std::fmt::Display for Disassembly<T> {
     }
 }
 
+#[derive(Default)]
+struct NativeDisassemblyOutput {
+    instruction: Option<AssemblyInstruction>,
+}
+
 impl api::AssemblyEmit for NativeDisassemblyOutput {
     fn dump(
         &mut self,
@@ -429,12 +443,22 @@ impl api::AssemblyEmit for NativeDisassemblyOutput {
         mnemonic: &libsla_sys::cxx::CxxString,
         body: &libsla_sys::cxx::CxxString,
     ) {
+        assert!(
+            self.instruction.is_none(),
+            "native disassembly should dump 1 instruction"
+        );
+
         self.instruction = Some(AssemblyInstruction {
             address: address.into(),
             mnemonic: mnemonic.to_string(),
             body: body.to_string(),
         });
     }
+}
+
+#[derive(Default)]
+struct PcodeDisassemblyOutput {
+    instructions: Vec<PcodeInstruction>,
 }
 
 impl api::PcodeEmit for PcodeDisassemblyOutput {
@@ -492,11 +516,6 @@ impl api::LoadImage for InstructionLoader<'_> {
 // ask users to implement can be named in a more Rustic fashion.
 pub trait LoadImage {
     fn instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String>;
-}
-
-enum DisassemblyKind<'a> {
-    Native(&'a mut NativeDisassemblyOutput),
-    Pcode(&'a mut PcodeDisassemblyOutput),
 }
 
 /// The encoding of the compiled sleigh specification (.slaspec).
@@ -615,6 +634,20 @@ impl GhidraSleigh {
         Default::default()
     }
 
+    /// Convert an address to a system address. Returns `None` if the provided address space cannot
+    /// be mapped to a system address space.
+    fn sys_address(&self, address: &Address) -> Option<UniquePtr<sys::Address>> {
+        // SAFETY: The provided address space has been verified to be safe
+        Some(unsafe {
+            sys::new_address(
+                self.sys_address_space(address.address_space.id)?,
+                address.offset,
+            )
+        })
+    }
+
+    /// Creates address space using the given address space id. Returns `None` if the provided id
+    /// cannot be mapped to a system address space.
     fn sys_address_space(&self, space_id: AddressSpaceId) -> Option<*mut sys::AddrSpace> {
         let num_spaces = self.sleigh.num_spaces();
         for i in 0..num_spaces {
@@ -627,70 +660,6 @@ impl GhidraSleigh {
         }
 
         None
-    }
-
-    fn disassemble(
-        &self,
-        loader: &dyn LoadImage,
-        address: Address,
-        kind: DisassemblyKind,
-    ) -> Result<VarnodeData> {
-        let address = unsafe {
-            sys::new_address(
-                self.sys_address_space(address.address_space.id)
-                    .expect("invalid space id"),
-                address.offset,
-            )
-        };
-
-        let loader = InstructionLoader(loader);
-        let rust_loader = rust::RustLoadImage(&loader);
-
-        let response = match kind {
-            DisassemblyKind::Pcode(output) => {
-                let mut emitter = rust::RustPcodeEmit(output);
-                self.sleigh
-                    .disassemble_pcode(&rust_loader, &mut emitter, address.as_ref().unwrap())
-            }
-            DisassemblyKind::Native(output) => {
-                let mut emitter = rust::RustAssemblyEmit(output);
-                self.sleigh.disassemble_native(
-                    &rust_loader,
-                    &mut emitter,
-                    address.as_ref().unwrap(),
-                )
-            }
-        };
-
-        let bytes_consumed = response
-            .map_err(|err| Error::DependencyError {
-                message: Cow::Borrowed("failed to decode instruction"),
-                source: Box::new(err),
-            })?
-            .try_into()
-            .map_err(|err| {
-                Error::InternalError(format!("instruction origin size is too large: {err}"))
-            })?;
-
-        let source = VarnodeData {
-            address: (&*address).into(),
-            size: bytes_consumed,
-        };
-
-        // Sleigh may attempt to read more bytes than are available to read.
-        // Unfortuantely the callback API does not provide any mechanism to
-        // inform the caller that only a subset of the requested bytes are valid.
-        // Since many ISAs are variable-length instructions, it is possible the
-        // valid subset will decode to a valid instruction, and the requested length
-        // was an over-estimation.
-        //
-        // This is a sanity check to determine if the bytes Sleigh used for decoding
-        // are all valid.
-        if !loader.readable(&source) {
-            return Err(Error::InsufficientData(source));
-        }
-
-        Ok(source)
     }
 }
 
@@ -748,22 +717,46 @@ impl Sleigh for GhidraSleigh {
         &self,
         loader: &dyn LoadImage,
         address: Address,
-    ) -> Result<Disassembly<PcodeInstruction>> {
-        let mut output = Default::default();
-        let origin = self.disassemble(loader, address, DisassemblyKind::Pcode(&mut output))?;
-        Ok(Disassembly::new(output.instructions, origin))
+    ) -> Result<PcodeDisassembly> {
+        let sys_address = self.sys_address(&address).expect("invalid address");
+        let loader = InstructionLoader(loader);
+        let rust_loader = rust::RustLoadImage(&loader);
+        let mut output = PcodeDisassemblyOutput::default();
+        let mut emitter = rust::RustPcodeEmit(&mut output);
+        let response = self.sleigh.disassemble_pcode(
+            &rust_loader,
+            &mut emitter,
+            sys_address.as_ref().unwrap(),
+        );
+
+        Ok(PcodeDisassembly {
+            origin: handle_disassembly_response(response, loader, address)?,
+            instructions: output.instructions,
+        })
     }
 
     fn disassemble_native(
         &self,
         loader: &dyn LoadImage,
         address: Address,
-    ) -> Result<Disassembly<AssemblyInstruction>> {
-        let mut output = Default::default();
-        let origin = self.disassemble(loader, address, DisassemblyKind::Native(&mut output))?;
+    ) -> Result<NativeDisassembly> {
+        let sys_address = self.sys_address(&address).expect("invalid address");
+        let loader = InstructionLoader(loader);
+        let rust_loader = rust::RustLoadImage(&loader);
+        let mut output = NativeDisassemblyOutput::default();
+        let mut emitter = rust::RustAssemblyEmit(&mut output);
+        let response = self.sleigh.disassemble_native(
+            &rust_loader,
+            &mut emitter,
+            sys_address.as_ref().unwrap(),
+        );
 
-        // TODO Convert this into an object that holds just one instruction
-        Ok(Disassembly::new(vec![output.instruction.unwrap()], origin))
+        Ok(NativeDisassembly {
+            origin: handle_disassembly_response(response, loader, address)?,
+            instruction: output.instruction.ok_or_else(|| {
+                Error::InternalError("ghidra did not disassemble an instruction".to_owned())
+            })?,
+        })
     }
 
     fn register_name_map(&self) -> BTreeMap<VarnodeData, String> {
@@ -773,4 +766,47 @@ impl Sleigh for GhidraSleigh {
             .map(|data| (data.register().into(), data.name().to_string()))
             .collect()
     }
+}
+
+/// Construct the origin of the disassembly. This can fail if the disassembly is determined to
+/// have originated from invalid data.
+fn handle_disassembly_response(
+    response: std::result::Result<i32, libsla_sys::cxx::Exception>,
+    loader: InstructionLoader,
+    address: Address,
+) -> Result<VarnodeData> {
+    let source = VarnodeData {
+        address,
+        size: num_bytes_disassembled(response)?,
+    };
+
+    // Sleigh may attempt to read more bytes than are available to read.
+    // Unfortuantely the callback API does not provide any mechanism to
+    // inform the caller that only a subset of the requested bytes are valid.
+    // Since many ISAs are variable-length instructions, it is possible the
+    // valid subset will decode to a valid instruction, and the requested length
+    // was an over-estimation.
+    //
+    // This is a sanity check to determine if the bytes Sleigh used for decoding
+    // are all valid.
+    if !loader.readable(&source) {
+        return Err(Error::InsufficientData(source));
+    }
+
+    Ok(source)
+}
+
+fn num_bytes_disassembled(
+    response: std::result::Result<i32, libsla_sys::cxx::Exception>,
+) -> Result<usize> {
+    let bytes_consumed = response
+        .map_err(|err| Error::DependencyError {
+            message: Cow::Borrowed("failed to decode instruction"),
+            source: Box::new(err),
+        })?
+        .try_into()
+        .map_err(|err| {
+            Error::InternalError(format!("instruction origin size is too large: {err}"))
+        })?;
+    Ok(bytes_consumed)
 }
