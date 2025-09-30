@@ -382,7 +382,7 @@ impl std::fmt::Display for AssemblyInstruction {
 }
 
 /// Disassembly of an instruction into pcode
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PcodeDisassembly {
     /// The disassembled instructions
     pub instructions: Vec<PcodeInstruction>,
@@ -392,13 +392,26 @@ pub struct PcodeDisassembly {
 }
 
 /// Disassembly of an instruction into its native assembly
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NativeDisassembly {
     /// The disassembled instruction
     pub instruction: AssemblyInstruction,
 
     /// The origin of the instructions
     pub origin: VarnodeData,
+}
+
+impl std::fmt::Display for NativeDisassembly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "[{origin}]: {instruction}",
+            origin = self.origin,
+            instruction = self.instruction,
+        )?;
+
+        Ok(())
+    }
 }
 
 impl std::fmt::Display for PcodeDisassembly {
