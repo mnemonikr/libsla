@@ -208,7 +208,7 @@ fn test_assembly() -> Result<()> {
         let response = sleigh
             .disassemble_native(&load_image, address)
             .expect("Failed to decode instruction");
-        let instruction = &response.instructions[0];
+        let instruction = &response.instruction;
         assert_eq!(instruction.address.address_space.name, expected_entry.0);
         assert_eq!(instruction.address.offset, expected_entry.1);
         assert_eq!(instruction.mnemonic, expected_entry.2);
@@ -372,7 +372,7 @@ fn verify_sleigh(sleigh: GhidraSleigh) {
         .disassemble_native(&loader, address)
         .expect("disassembly should succeed");
 
-    let instruction = &disassembly.instructions[0];
+    let instruction = &disassembly.instruction;
     assert_eq!(instruction.mnemonic, "PUSH");
     assert_eq!(instruction.body, "RBP");
 }
