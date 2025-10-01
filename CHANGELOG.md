@@ -1,6 +1,14 @@
 ## Unreleased
 
-Nothing here yet.
+Nothing here yet
+
+## [v1.0.0](https://github.com/mnemonikr/libsla/tree/v1.0.0)
+
+### Changed
+
+* `LoadImage` trait renamed to `InstructionLoader`.
+* `disassemble_native` returns a single instruction instead of a singleton list.
+* `GhidraSleighBuilder` sla parsing simplified. Internally no longer supports `libsla-sys` XML decoding.
 
 ## [v0.4.4](https://github.com/mnemonikr/libsla/tree/v0.4.4)
 

@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "libsla"
-version = "0.4.4"
+version = "1.0.0"
 dependencies = [
  "flate2",
  "libsla-sys",
