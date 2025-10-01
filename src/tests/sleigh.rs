@@ -12,8 +12,8 @@ use crate::*;
 
 struct LoadImageImpl(Vec<u8>);
 
-impl LoadImage for LoadImageImpl {
-    fn instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String> {
+impl InstructionLoader for LoadImageImpl {
+    fn load_instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String> {
         let start: usize = data.address.offset.try_into().expect("invalid offset");
         if start >= self.0.len() {
             return Err("Requested fill outside image".to_string());

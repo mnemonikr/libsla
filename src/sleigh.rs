@@ -60,14 +60,14 @@ pub trait Sleigh {
     /// Disassemble the instructions at the given address into pcode.
     fn disassemble_pcode(
         &self,
-        loader: &dyn LoadImage,
+        loader: &dyn InstructionLoader,
         address: Address,
     ) -> Result<PcodeDisassembly>;
 
     /// Disassemble the instructions at the given address into native assembly instructions.
     fn disassemble_native(
         &self,
-        loader: &dyn LoadImage,
+        loader: &dyn InstructionLoader,
         address: Address,
     ) -> Result<NativeDisassembly>;
 
@@ -483,18 +483,18 @@ impl api::PcodeEmit for PcodeDisassemblyOutput {
 
 /// Wrapper around the public load image API so that it can be converted to the native API.
 /// This is required in order to pass a trait object reference down into the native API.
-struct InstructionLoader<'a>(&'a dyn LoadImage);
+struct InstructionLoaderWrapper<'a>(&'a dyn InstructionLoader);
 
-impl InstructionLoader<'_> {
+impl InstructionLoaderWrapper<'_> {
     /// Returns true only if the requested number of instruction bytes are read.
-    fn readable(&self, varnode: &VarnodeData) -> bool {
+    fn is_readable(&self, varnode: &VarnodeData) -> bool {
         self.0
-            .instruction_bytes(varnode)
+            .load_instruction_bytes(varnode)
             .is_ok_and(|data| data.len() == varnode.size)
     }
 }
 
-impl api::LoadImage for InstructionLoader<'_> {
+impl api::LoadImage for InstructionLoaderWrapper<'_> {
     fn load_fill(
         &self,
         data: &mut [u8],
@@ -505,17 +505,20 @@ impl api::LoadImage for InstructionLoader<'_> {
             address: address.into(),
         };
 
-        let loaded_data = self.0.instruction_bytes(&varnode)?;
+        let loaded_data = self.0.load_instruction_bytes(&varnode)?;
         data[..loaded_data.len()].copy_from_slice(&loaded_data);
 
         Ok(())
     }
 }
 
-// TODO This should be renamed. The GhidraSleigh API is called LoadImage but the external trait we
-// ask users to implement can be named in a more Rustic fashion.
-pub trait LoadImage {
-    fn instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String>;
+/// Interface for loading instruction bytes to be disassembled.
+pub trait InstructionLoader {
+    /// Load instruction bytes from the requested source. If not all of the requested bytes are
+    /// available, then the initial sequence of bytes which are available should be returned. For
+    /// example, if the caller requests 30 bytes but only the first 10 are available, only those 10
+    /// should be returned.
+    fn load_instruction_bytes(&self, source: &VarnodeData) -> std::result::Result<Vec<u8>, String>;
 }
 
 /// The encoding of the compiled sleigh specification (.slaspec).
@@ -715,11 +718,11 @@ impl Sleigh for GhidraSleigh {
 
     fn disassemble_pcode(
         &self,
-        loader: &dyn LoadImage,
+        loader: &dyn InstructionLoader,
         address: Address,
     ) -> Result<PcodeDisassembly> {
         let sys_address = self.sys_address(&address).expect("invalid address");
-        let loader = InstructionLoader(loader);
+        let loader = InstructionLoaderWrapper(loader);
         let rust_loader = rust::RustLoadImage(&loader);
         let mut output = PcodeDisassemblyOutput::default();
         let mut emitter = rust::RustPcodeEmit(&mut output);
@@ -737,11 +740,11 @@ impl Sleigh for GhidraSleigh {
 
     fn disassemble_native(
         &self,
-        loader: &dyn LoadImage,
+        loader: &dyn InstructionLoader,
         address: Address,
     ) -> Result<NativeDisassembly> {
         let sys_address = self.sys_address(&address).expect("invalid address");
-        let loader = InstructionLoader(loader);
+        let loader = InstructionLoaderWrapper(loader);
         let rust_loader = rust::RustLoadImage(&loader);
         let mut output = NativeDisassemblyOutput::default();
         let mut emitter = rust::RustAssemblyEmit(&mut output);
@@ -772,7 +775,7 @@ impl Sleigh for GhidraSleigh {
 /// have originated from invalid data.
 fn handle_disassembly_response(
     response: std::result::Result<i32, libsla_sys::cxx::Exception>,
-    loader: InstructionLoader,
+    loader: InstructionLoaderWrapper,
     address: Address,
 ) -> Result<VarnodeData> {
     let source = VarnodeData {
@@ -789,7 +792,7 @@ fn handle_disassembly_response(
     //
     // This is a sanity check to determine if the bytes Sleigh used for decoding
     // are all valid.
-    if !loader.readable(&source) {
+    if !loader.is_readable(&source) {
         return Err(Error::InsufficientData(source));
     }
 

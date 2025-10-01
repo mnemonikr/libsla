@@ -35,7 +35,7 @@ let sleigh = GhidraSleigh::builder()
     .processor_spec(sleigh_config::processor_x86::PSPEC_X86_64)?
     .build(sleigh_config::processor_x86::SLA_X86_64)?;
 
-// The instruction reader is defined by the user and implements the LoadImage trait.
+// The instruction reader is defined by the user and implements the InstructionLoader trait.
 let instruction_reader = InstructionReader::new();
 
 // Instruction to decode from the reader.
