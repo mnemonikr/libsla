@@ -8,10 +8,12 @@ repository = "https://github.com/mnemonikr/libsla"
 
 [features]
 fuzzing = ["libsla-sys/fuzzing"]
+serde = ["dep:serde"]
 
 [dependencies]
 thiserror = "2.0"
 libsla-sys = { version = "0.1.4" }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 flate2 = "1.1"

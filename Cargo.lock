@@ -195,6 +195,7 @@ version = "1.0.0"
 dependencies = [
  "flate2",
  "libsla-sys",
+ "serde",
  "sleigh-config",
  "thiserror",
 ]
