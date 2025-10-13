@@ -366,7 +366,7 @@ impl std::fmt::Display for PcodeInstruction {
 }
 
 /// A disassembled native assembly instruction
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssemblyInstruction {
     /// The origin of the assembly instruction
@@ -404,7 +404,7 @@ pub struct PcodeDisassembly {
 }
 
 /// Disassembly of an instruction into its native assembly
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NativeDisassembly {
     /// The disassembled instruction

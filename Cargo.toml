@@ -18,3 +18,4 @@ serde = { version = "1", features = ["derive"], optional = true }
 [dev-dependencies]
 flate2 = "1.1"
 sleigh-config = { version = "1", features = ["x86"] }
+serde_json = { version = "1.0.145" }
