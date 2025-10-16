@@ -189,7 +189,9 @@ impl From<&sys::VarnodeData> for VarnodeData {
     }
 }
 
-/// Address space identifier for an address space
+/// Address space identifier for an address space. While this value is unique, it is **NOT**
+/// guaranteed to be deterministically constructed. This means different instances of Sleigh may
+/// identify the same address space with _different_ identifiers.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AddressSpaceId(usize);
 
@@ -315,7 +317,9 @@ impl From<sys::spacetype> for AddressSpaceType {
     }
 }
 
-/// A pcode instruction
+/// A pcode instruction. Interpreting the pcode instruction can require additional context in some
+/// cases. For example, the [OpCode::Load] operation encodes the [AddressSpace] using the
+/// [AddressSpaceId]. This identifier in particular may differ across Sleigh instances.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PcodeInstruction {
     /// The originating address for this instruction. This information is necessary to include for
