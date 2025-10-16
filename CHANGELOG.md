@@ -2,7 +2,7 @@
 
 ### Added
 
-* Support for serializing libsla structures using serde
+* Support for serializing `libsla` structures using `serde`
 
 ### Fixed
 
