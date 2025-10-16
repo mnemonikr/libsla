@@ -650,9 +650,10 @@ impl GhidraSleigh {
     /// space cannot be mapped to a system address space.
     fn sys_address_space(&self, address_space: &AddressSpace) -> Option<*mut sys::AddrSpace> {
         for i in 0..self.sleigh.num_spaces() {
-            // SAFETY: The address space returned here is safe to dereference
-            let sys_addr_space = unsafe { &mut *self.sleigh.address_space(i) };
-            if sys_addr_space.name() == address_space.name.as_ref() {
+            let sys_addr_space = self.sleigh.address_space(i);
+
+            // SAFETY: The address space is safe to dereference
+            if unsafe { (&*sys_addr_space).name() } == address_space.name.as_ref() {
                 return Some(sys_addr_space);
             }
         }
