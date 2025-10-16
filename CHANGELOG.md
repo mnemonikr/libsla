@@ -1,6 +1,8 @@
 ## Unreleased
 
-Nothing here yet
+### Fixed
+
+* `AddressSpace` from another Sleigh instance is now properly recognized.
 
 ## [v1.0.0](https://github.com/mnemonikr/libsla/tree/v1.0.0)
 

@@ -364,6 +364,24 @@ fn all_register_names() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn multiple_sleigh_data_sharing() -> Result<()> {
+    let sleigh1 = GhidraSleigh::builder()
+        .processor_spec(PROCESSOR_SPEC)?
+        .build(SLEIGH_SPEC)?;
+    let sleigh2 = GhidraSleigh::builder()
+        .processor_spec(PROCESSOR_SPEC)?
+        .build(SLEIGH_SPEC)?;
+    for (reg, name) in &sleigh1.register_name_map() {
+        // Sanity check to ensure sleigh1 correctly identifies this as a register
+        assert_eq!(name, &sleigh1.register_name(reg).unwrap());
+
+        // Even though the reg varnode is from sleigh1, it should still be recognized by sleigh2
+        assert_eq!(name, &sleigh2.register_name(reg).unwrap());
+    }
+    Ok(())
+}
+
 fn verify_sleigh(sleigh: GhidraSleigh) {
     // 0x55 = PUSH RBP
     let loader = LoadImageImpl(vec![0x55]);
