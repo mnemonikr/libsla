@@ -445,7 +445,6 @@ impl std::fmt::Display for PcodeDisassembly {
 }
 
 #[derive(Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct NativeDisassemblyOutput {
     instruction: Option<AssemblyInstruction>,
 }
