@@ -640,25 +640,20 @@ impl GhidraSleigh {
     /// Convert an address to a system address. Returns `None` if the provided address space cannot
     /// be mapped to a system address space.
     fn sys_address(&self, address: &Address) -> Option<UniquePtr<sys::Address>> {
+        let sys_addr_space = self.sys_address_space(&address.address_space)?;
+
         // SAFETY: The provided address space has been verified to be safe
-        Some(unsafe {
-            sys::new_address(
-                self.sys_address_space(address.address_space.id)?,
-                address.offset,
-            )
-        })
+        Some(unsafe { sys::new_address(sys_addr_space, address.offset) })
     }
 
-    /// Creates address space using the given address space id. Returns `None` if the provided id
-    /// cannot be mapped to a system address space.
-    fn sys_address_space(&self, space_id: AddressSpaceId) -> Option<*mut sys::AddrSpace> {
-        let num_spaces = self.sleigh.num_spaces();
-        for i in 0..num_spaces {
-            let addr_space = self.sleigh.address_space(i);
-
+    /// Converts an address space to a system address space. Returns `None` if the provided address
+    /// space cannot be mapped to a system address space.
+    fn sys_address_space(&self, address_space: &AddressSpace) -> Option<*mut sys::AddrSpace> {
+        for i in 0..self.sleigh.num_spaces() {
             // SAFETY: The address space returned here is safe to dereference
-            if AddressSpaceId::from(unsafe { &*addr_space }) == space_id {
-                return Some(addr_space);
+            let sys_addr_space = unsafe { &mut *self.sleigh.address_space(i) };
+            if sys_addr_space.name() == address_space.name.as_ref() {
+                return Some(sys_addr_space);
             }
         }
 
@@ -685,7 +680,7 @@ impl Sleigh for GhidraSleigh {
     /// Get the register name for a varnode targeting a register. This will return `None` if the
     /// target is not a valid register.
     fn register_name(&self, target: &VarnodeData) -> Option<String> {
-        let base = self.sys_address_space(target.address.address_space.id)?;
+        let base = self.sys_address_space(&target.address.address_space)?;
 
         // If offset + size overflows then Ghidra can accidentally match a register
         //
