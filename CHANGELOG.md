@@ -6,7 +6,7 @@ Nothing here yet.
 
 ### Added
 
-* Support for serializing `libsla` structures using `serde`
+* Support for serializing `libsla` structures using `serde`. Thanks @soruh
 
 ### Fixed
 
