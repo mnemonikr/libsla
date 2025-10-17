@@ -1,8 +1,12 @@
 ## Unreleased
 
+Nothing here yet.
+
+## [v1.1.0](https://github.com/mnemonikr/libsla/tree/v1.1.0)
+
 ### Added
 
-* Support for serializing `libsla` structures using `serde`
+* Support for serializing `libsla` structures using `serde`. Thanks @soruh
 
 ### Fixed
 
