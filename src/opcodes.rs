@@ -6,6 +6,7 @@ use libsla_sys::sys;
 
 /// A representation of opcodes for p-code instructions.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum OpCode {
     /// Copy a sequence of bytes from one fixed location to another.
     Copy,
@@ -69,6 +70,7 @@ pub enum OpCode {
 
 /// Operations for boolean, single-bit inputs.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BoolOp {
     /// Negate a single bit: `!x`.
     Negate,
@@ -87,6 +89,7 @@ pub enum BoolOp {
 /// operation does not include `IntSign` as an argument, then distinguishing between signed and
 /// unsigned is not applicable for the operation.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IntSign {
     /// An integer where the most significant bit (msb) indicates the sign of the integer. The integer is
     /// positive if the msb is `0` and negative if the msb is `1`. Signed integers are represented
@@ -99,6 +102,7 @@ pub enum IntSign {
 
 /// Operations on integers.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IntOp {
     /// Add two integers: `x + y`.
     Add,
@@ -155,6 +159,7 @@ pub enum IntOp {
 
 /// Operations on floating-point numbers.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FloatOp {
     /// Check if two numbers are equal: `x == y`.
     Equal,
@@ -213,6 +218,7 @@ pub enum FloatOp {
 
 /// Operations which represent black-box placeholders for some sequence of changes to the machine state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PseudoOp {
     /// A call that cannot be semantically represented in p-code. For example, a syscall.
     CallOther,
@@ -229,6 +235,7 @@ pub enum PseudoOp {
 /// for use in processor specifications and therefore will never be emitted when directly
 /// translating machine instructions.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AnalysisOp {
     /// Copies a sequence of bytes to a fixed location. There are multiple origins possible for the
     /// bytes. The selected origin depends on the execution path leading to this operation.

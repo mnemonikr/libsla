@@ -81,6 +81,7 @@ pub trait Sleigh {
 
 /// An address is represented by an offset into an address space
 #[derive(Ord, PartialOrd, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Address {
     /// The standard interpretation of the offset is an index into the associated address space.
     /// However, when used in conjunction with the constant address space, the offset is the actual
@@ -132,6 +133,7 @@ impl From<&sys::Address> for Address {
 
 /// A VarnodeData represents the address and size of data.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VarnodeData {
     pub address: Address,
     pub size: usize,
@@ -193,6 +195,7 @@ impl From<&sys::VarnodeData> for VarnodeData {
 /// guaranteed to be deterministically constructed. This means different instances of Sleigh may
 /// identify the same address space with _different_ identifiers.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AddressSpaceId(usize);
 
 impl std::fmt::Debug for AddressSpaceId {
@@ -234,6 +237,7 @@ impl AddressSpaceId {
 
 /// Information about an address space
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AddressSpace {
     pub id: AddressSpaceId,
     pub name: Cow<'static, str>,
@@ -285,6 +289,7 @@ impl From<&sys::AddrSpace> for AddressSpaceId {
 
 /// Types for an [AddressSpace].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AddressSpaceType {
     /// Special space to represent constants
     Constant,
@@ -321,6 +326,7 @@ impl From<sys::spacetype> for AddressSpaceType {
 /// cases. For example, the [OpCode::Load] operation encodes the [AddressSpace] using the
 /// [AddressSpaceId]. This identifier in particular may differ across Sleigh instances.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PcodeInstruction {
     /// The originating address for this instruction. This information is necessary to include for
     /// the [OpCode::BranchIndirect] operation, which determines the destination address space from
@@ -360,7 +366,8 @@ impl std::fmt::Display for PcodeInstruction {
 }
 
 /// A disassembled native assembly instruction
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssemblyInstruction {
     /// The origin of the assembly instruction
     pub address: Address,
@@ -387,6 +394,7 @@ impl std::fmt::Display for AssemblyInstruction {
 
 /// Disassembly of an instruction into pcode
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PcodeDisassembly {
     /// The disassembled instructions
     pub instructions: Vec<PcodeInstruction>,
@@ -396,7 +404,8 @@ pub struct PcodeDisassembly {
 }
 
 /// Disassembly of an instruction into its native assembly
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NativeDisassembly {
     /// The disassembled instruction
     pub instruction: AssemblyInstruction,

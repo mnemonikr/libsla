@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Added
+
+* Support for serializing `libsla` structures using `serde`
+
 ### Fixed
 
 * `AddressSpace` from another Sleigh instance is now properly recognized.
