@@ -28,7 +28,7 @@
 //! let instruction_address = Address::new(address_space, 0);
 //!
 //! // Confirming this is indeed PUSH RBP.
-//! let native_disassembly = sleigh.disassemble_native(&instructions, instruction_address.clone())?;
+//! let native_disassembly = sleigh.disassemble_native(&instructions, instruction_address)?;
 //! assert_eq!(native_disassembly.instruction.mnemonic, "PUSH");
 //! assert_eq!(native_disassembly.instruction.body, "RBP");
 //! # Ok(())
@@ -55,13 +55,13 @@
 //! // PUSH RBP
 //! let instructions = InstructionBytes::new(vec![0x55]);
 //! let instruction_address = Address::new(sleigh.default_code_space(), 0);
-//!
 //! let pcode_disassembly = sleigh.disassemble_pcode(&instructions, instruction_address)?;
 //! let pcode_instructions = pcode_disassembly.instructions;
 //!
 //! assert_eq!(pcode_instructions.len(), 3, "There should be 3 pcode instructions");
 //!
 //! // Copy RBP into a temporary
+//! let copy_destination = pcode_instructions[0].output.as_ref().unwrap();
 //! assert_eq!(pcode_instructions[0].op_code, OpCode::Copy);
 //! assert_eq!(sleigh.register_name(&pcode_instructions[0].inputs[0]).unwrap(), "RBP");
 //!
@@ -73,6 +73,7 @@
 //! // Store temporary (RBP) into memory address pointed to by RSP
 //! assert_eq!(pcode_instructions[2].op_code, OpCode::Store);
 //! assert_eq!(sleigh.register_name(&pcode_instructions[2].inputs[1]).unwrap(), "RSP");
+//! assert_eq!(&pcode_instructions[2].inputs[2], copy_destination);
 //!
 //! # Ok(())
 //! # }

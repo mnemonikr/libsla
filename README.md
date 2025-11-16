@@ -29,20 +29,56 @@ using `make sleigh_opt`.
 
 # Example
 
+Disassemble bytes into native assembly instructions
+
 ```rust
-// Build Sleigh with configuration files from sleigh-config crate
 let sleigh = GhidraSleigh::builder()
     .processor_spec(sleigh_config::processor_x86::PSPEC_X86_64)?
     .build(sleigh_config::processor_x86::SLA_X86_64)?;
 
-// The instruction reader is defined by the user and implements the InstructionLoader trait.
-let instruction_reader = InstructionReader::new();
+// PUSH RBP instruction is the byte 0x55.
+let instructions = InstructionBytes::new(vec![0x55]);
 
-// Instruction to decode from the reader.
-let instruction_offset = 0x800000;
+// InstructionBytes is a simple byte loader that does not model multiple address spaces.
+// However an address space is required, so for simplicity use the default code space.
 let address_space = sleigh.default_code_space();
-let instruction_address = Address::new(instruction_offset, address_space);
 
-// Disassemble!
-let pcode_disassembly = sleigh.disassemble_pcode(&instruction_reader, instruction_address)?;
+// Start disassembly from the first byte (index 0)
+let instruction_address = Address::new(address_space, 0);
+
+// Confirming this is indeed PUSH RBP.
+let native_disassembly = sleigh.disassemble_native(&instructions, instruction_address)?;
+assert_eq!(native_disassembly.instruction.mnemonic, "PUSH");
+assert_eq!(native_disassembly.instruction.body, "RBP");
+```
+
+Disassemble bytes into pcode instructions for program modeling.
+
+```rust
+let sleigh = GhidraSleigh::builder()
+    .processor_spec(sleigh_config::processor_x86::PSPEC_X86_64)?
+    .build(sleigh_config::processor_x86::SLA_X86_64)?;
+
+// PUSH RBP
+let instructions = InstructionBytes::new(vec![0x55]);
+let instruction_address = Address::new(sleigh.default_code_space(), 0);
+let pcode_disassembly = sleigh.disassemble_pcode(&instructions, instruction_address)?;
+let pcode_instructions = pcode_disassembly.instructions;
+
+assert_eq!(pcode_instructions.len(), 3, "There should be 3 pcode instructions");
+
+// Copy RBP into a temporary
+let copy_destination = pcode_instructions[0].output.as_ref().unwrap();
+assert_eq!(pcode_instructions[0].op_code, OpCode::Copy);
+assert_eq!(sleigh.register_name(&pcode_instructions[0].inputs[0]).unwrap(), "RBP");
+
+// Subtract 8 bytes from RSP
+assert_eq!(pcode_instructions[1].op_code, OpCode::Int(IntOp::Subtract));
+assert_eq!(sleigh.register_name(&pcode_instructions[1].inputs[0]).unwrap(), "RSP");
+assert_eq!(pcode_instructions[1].inputs[1].address.offset, 8);
+
+// Store temporary (RBP) into memory address pointed to by RSP
+assert_eq!(pcode_instructions[2].op_code, OpCode::Store);
+assert_eq!(sleigh.register_name(&pcode_instructions[2].inputs[1]).unwrap(), "RSP");
+assert_eq!(&pcode_instructions[2].inputs[2], copy_destination);
 ```
