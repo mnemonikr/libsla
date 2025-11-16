@@ -494,6 +494,43 @@ impl api::PcodeEmit for PcodeDisassemblyOutput {
     }
 }
 
+/// A sequence of instruction bytes which can be used by Sleigh for disassembly.
+pub struct InstructionBytes(Vec<u8>);
+
+impl InstructionBytes {
+    /// Create a new instance for the provided sequence of instruction bytes
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
+
+impl FromIterator<u8> for InstructionBytes {
+    fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl InstructionLoader for InstructionBytes {
+    fn load_instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String> {
+        let start = usize::try_from(data.address.offset)
+            .map_err(|err| format!("offset should convert to usize: {err:?}"))?;
+        if start >= self.0.len() {
+            return Err(format!(
+                "Offset {start} exceeds count of instruction bytes {len}",
+                len = self.0.len()
+            ));
+        }
+
+        // Do not overflow
+        let end = start.saturating_add(data.size);
+
+        // Do not exceed the capacity of the instruction byte vec
+        let end = usize::min(end, self.0.len());
+
+        Ok(self.0[start..end].to_vec())
+    }
+}
+
 /// Wrapper around the public load image API so that it can be converted to the native API.
 /// This is required in order to pass a trait object reference down into the native API.
 struct InstructionLoaderWrapper<'a>(&'a dyn InstructionLoader);

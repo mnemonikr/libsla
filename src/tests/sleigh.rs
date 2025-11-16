@@ -10,21 +10,6 @@ use sleigh_config::processor_x86::SLA_X86_64 as SLEIGH_SPEC;
 
 use crate::*;
 
-struct LoadImageImpl(Vec<u8>);
-
-impl InstructionLoader for LoadImageImpl {
-    fn load_instruction_bytes(&self, data: &VarnodeData) -> std::result::Result<Vec<u8>, String> {
-        let start: usize = data.address.offset.try_into().expect("invalid offset");
-        if start >= self.0.len() {
-            return Err("Requested fill outside image".to_string());
-        }
-
-        // Never exceed image
-        let end = usize::min(start + data.size, self.0.len());
-        Ok(self.0[start..end].to_vec())
-    }
-}
-
 #[test]
 pub fn addr_space_type() -> Result<()> {
     assert_eq!(
@@ -140,8 +125,9 @@ fn build_raw_sla() -> Result<()> {
 #[test]
 fn test_pcode() -> Result<()> {
     const NUM_INSTRUCTIONS: usize = 7;
-    let load_image =
-        LoadImageImpl(b"\x55\x48\x89\xe5\x89\x7d\xfc\x8b\x45\xfc\x0f\xaf\xc0\x5d\xc3".to_vec());
+    let load_image = InstructionBytes::new(
+        b"\x55\x48\x89\xe5\x89\x7d\xfc\x8b\x45\xfc\x0f\xaf\xc0\x5d\xc3".to_vec(),
+    );
     let sleigh = GhidraSleigh::builder()
         .processor_spec(PROCESSOR_SPEC)?
         .build(SLEIGH_SPEC)?;
@@ -164,7 +150,7 @@ fn test_pcode() -> Result<()> {
 #[test]
 fn test_assembly() -> Result<()> {
     let load_image =
-        LoadImageImpl(b"\x55\x48\x89\xe5\x89\x7d\xfc\x8b\x45\xfc\x01\xc0\x5d\xc3".to_vec());
+        InstructionBytes::new(b"\x55\x48\x89\xe5\x89\x7d\xfc\x8b\x45\xfc\x01\xc0\x5d\xc3".to_vec());
     let sleigh = GhidraSleigh::builder()
         .processor_spec(PROCESSOR_SPEC)?
         .build(SLEIGH_SPEC)?;
@@ -300,7 +286,7 @@ pub fn invalid_register_name() -> Result<()> {
 
 #[test]
 pub fn insufficient_data() -> Result<()> {
-    let load_image = LoadImageImpl(b"\x00".to_vec());
+    let load_image = InstructionBytes::new(b"\x00".to_vec());
     let sleigh = GhidraSleigh::builder()
         .processor_spec(PROCESSOR_SPEC)?
         .build(SLEIGH_SPEC)?;
@@ -322,7 +308,7 @@ pub fn insufficient_data() -> Result<()> {
 
 #[test]
 pub fn invalid_instruction() -> Result<()> {
-    let load_image = LoadImageImpl(std::iter::repeat_n(0xFF, 16).collect());
+    let load_image = InstructionBytes::new(std::iter::repeat_n(0xFF, 16).collect());
     let sleigh = GhidraSleigh::builder()
         .processor_spec(PROCESSOR_SPEC)?
         .build(SLEIGH_SPEC)?;
@@ -384,7 +370,7 @@ fn multiple_sleigh_data_sharing() -> Result<()> {
 
 fn verify_sleigh(sleigh: GhidraSleigh) {
     // 0x55 = PUSH RBP
-    let loader = LoadImageImpl(vec![0x55]);
+    let loader = InstructionBytes::new(vec![0x55]);
     let address = Address::new(sleigh.default_code_space(), 0);
     let disassembly = sleigh
         .disassemble_native(&loader, address)
