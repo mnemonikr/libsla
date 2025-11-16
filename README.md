@@ -29,7 +29,7 @@ using `make sleigh_opt`.
 
 # Example
 
-Disassemble bytes into native assembly instructions
+Disassemble bytes into native assembly instructions.
 
 ```rust
 let sleigh = GhidraSleigh::builder()
@@ -52,7 +52,7 @@ assert_eq!(native_disassembly.instruction.mnemonic, "PUSH");
 assert_eq!(native_disassembly.instruction.body, "RBP");
 ```
 
-Disassemble bytes into pcode instructions for program modeling.
+Disassemble bytes into pcode instructions. Pcode instructions can be used for program modeling.
 
 ```rust
 let sleigh = GhidraSleigh::builder()
