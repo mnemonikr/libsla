@@ -2,6 +2,12 @@
 
 Nothing here yet.
 
+## [v1.2.0](https://github.com/mnemonikr/libsla/tree/v1.2.0)
+
+### Added
+
+* `InstructionBytes` which can be used by `Sleigh` to disassemble a sequence of bytes
+
 ## [v1.1.0](https://github.com/mnemonikr/libsla/tree/v1.1.0)
 
 ### Added
