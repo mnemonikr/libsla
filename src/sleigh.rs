@@ -77,6 +77,24 @@ pub trait Sleigh {
 
     /// Get a sorted map of registers to register names.
     fn register_name_map(&self) -> BTreeMap<VarnodeData, String>;
+
+    /// The names of the language's user-defined p-code operations, in the order
+    /// the specification declares them.
+    ///
+    /// A [`PseudoOp::CallOther`](crate::PseudoOp::CallOther) carries the index
+    /// of the operation it invokes and nothing else, so without this list a
+    /// consumer cannot say which operation it is looking at. The index is
+    /// assigned by the compiled specification and moves with it, which is why
+    /// it cannot be hardcoded.
+    #[must_use]
+    fn user_op_names(&self) -> Vec<String>;
+
+    /// The name of the user-defined p-code operation at `index`, or `None` when
+    /// the language declares no operation there.
+    #[must_use]
+    fn user_op_name(&self, index: usize) -> Option<String> {
+        self.user_op_names().into_iter().nth(index)
+    }
 }
 
 /// An address is represented by an offset into an address space
@@ -813,6 +831,14 @@ impl Sleigh for GhidraSleigh {
             .all_register_names()
             .into_iter()
             .map(|data| (data.register().into(), data.name().to_string()))
+            .collect()
+    }
+
+    fn user_op_names(&self) -> Vec<String> {
+        self.sleigh
+            .user_op_names()
+            .into_iter()
+            .map(|name| name.to_string())
             .collect()
     }
 }
