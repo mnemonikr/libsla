@@ -77,6 +77,10 @@ pub trait Sleigh {
 
     /// Get a sorted map of registers to register names.
     fn register_name_map(&self) -> BTreeMap<VarnodeData, String>;
+
+    /// Discard instruction parses cached by address while retaining the loaded
+    /// Sleigh specification.
+    fn clear_cache(&mut self) -> Result<()>;
 }
 
 /// An address is represented by an offset into an address space
@@ -671,7 +675,10 @@ impl GhidraSleighBuilder<HasSpec> {
                 source: Box::new(err),
             })?;
 
-        Ok(GhidraSleigh { sleigh })
+        Ok(GhidraSleigh {
+            sleigh,
+            processor_spec: self.store,
+        })
     }
 }
 
@@ -679,6 +686,8 @@ impl GhidraSleighBuilder<HasSpec> {
 pub struct GhidraSleigh {
     /// The sleigh object. This object holds a reference to the image loader.
     sleigh: UniquePtr<sys::SleighProxy>,
+    /// The processor context defaults reapplied after a decode-cache reset.
+    processor_spec: UniquePtr<sys::DocumentStorage>,
 }
 
 impl GhidraSleigh {
@@ -814,6 +823,20 @@ impl Sleigh for GhidraSleigh {
             .into_iter()
             .map(|data| (data.register().into(), data.name().to_string()))
             .collect()
+    }
+
+    fn clear_cache(&mut self) -> Result<()> {
+        let processor_spec = self
+            .processor_spec
+            .as_ref()
+            .expect("a built Sleigh instance retains its processor specification");
+        self.sleigh
+            .pin_mut()
+            .clear_cache(processor_spec)
+            .map_err(|err| Error::DependencyError {
+                message: Cow::Borrowed("failed to clear Ghidra sleigh's decode cache"),
+                source: Box::new(err),
+            })
     }
 }
 
