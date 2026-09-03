@@ -148,6 +148,23 @@ fn test_pcode() -> Result<()> {
 }
 
 #[test]
+fn clear_cache_reloads_bytes_at_a_reused_address() -> Result<()> {
+    let mut sleigh = GhidraSleigh::builder()
+        .processor_spec(PROCESSOR_SPEC)?
+        .build(SLEIGH_SPEC)?;
+    let address = Address::new(sleigh.default_code_space(), 0);
+    let al =
+        sleigh.disassemble_native(&InstructionBytes::new(vec![0x88, 0xd8]), address.clone())?;
+
+    sleigh.clear_cache()?;
+
+    let ah = sleigh.disassemble_native(&InstructionBytes::new(vec![0x88, 0xdc]), address)?;
+    assert_eq!(al.instruction.body, "AL,BL");
+    assert_eq!(ah.instruction.body, "AH,BL");
+    Ok(())
+}
+
+#[test]
 fn test_assembly() -> Result<()> {
     let load_image =
         InstructionBytes::new(b"\x55\x48\x89\xe5\x89\x7d\xfc\x8b\x45\xfc\x01\xc0\x5d\xc3".to_vec());
